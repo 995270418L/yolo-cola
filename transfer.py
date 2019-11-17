@@ -25,11 +25,11 @@ def transform_txt():
     for i in list:
         name = total_xml[i].split('.')[0] + ".jpg"
         if i in trainval:
-            valid_txt.write(name)
+            valid_txt.write(name + os.linesep)
             if i in train:
-                train_txt.write(name)
+                train_txt.write(name + os.linesep)
         else:
-            train_txt.write(name)
+            train_txt.write(name + os.linesep)
     train_txt.close()
     valid_txt.close()
 
@@ -55,7 +55,6 @@ def convert_annotation(image_id):
     size = root.find('size')
     w = int(size.find('width').text)
     h = int(size.find('height').text)
-
     for obj in root.iter('object'):
         cls = obj.find('name').text
         if cls not in classes:
@@ -65,7 +64,7 @@ def convert_annotation(image_id):
         b = (round(float(xmlbox.find('xmin').text), 3), round(float(xmlbox.find('xmax').text), 3), round(float(xmlbox.find('ymin').text), 3),
              round(float(xmlbox.find('ymax').text), 3))
         bb = convert((w, h), b)
-        out_file.write(str(cls_id) + " " + " ".join([str(a) for a in bb]))
+        out_file.write(str(cls_id) + " " + " ".join([str(a) for a in bb]) + os.linesep)
     out_file.close()
 
 # 每个 jpg 生成对应的 txt 文件

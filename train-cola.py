@@ -143,11 +143,8 @@ if __name__ == "__main__":
             epoch_batches_left = len(dataloader) - (batch_i + 1)
             time_left = datetime.timedelta(seconds=epoch_batches_left * (time.time() - start_time) / (batch_i + 1))
             log_str += f"\n---- ETA {time_left}"
-
             logger.info(log_str)
-
             model.seen += imgs.size(0)
-
         if epoch % opt.evaluation_interval == 0:
             logger.info("\n---- Evaluating Model ----")
             # Evaluate the model on the validation set
