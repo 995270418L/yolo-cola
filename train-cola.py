@@ -29,8 +29,8 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=100, help="number of epochs")
     parser.add_argument("--batch_size", type=int, default=8, help="size of each image batch")
     parser.add_argument("--gradient_accumulations", type=int, default=2, help="number of gradient accums before step")
-    parser.add_argument("--model_def", type=str, default="config/yolov3.cfg", help="path to model definition file")
-    parser.add_argument("--data_config", type=str, default="config/custom.data", help="path to data config file")
+    parser.add_argument("--model_def", type=str, default="config/yolov3-cola.cfg", help="path to model definition file")
+    parser.add_argument("--data_config", type=str, default="config/cola.data", help="path to data config file")
     parser.add_argument("--pretrained_weights", type=str, help="if specified starts from checkpoint model")
     parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads to use during batch generation")
     parser.add_argument("--img_size", type=int, default=416, help="size of each image dimension")
@@ -49,8 +49,8 @@ if __name__ == "__main__":
 
     # Get data configuration
     data_config = parse_data_config(opt.data_config)
-    train_path = data_config["train"]
-    valid_path = data_config["valid"]
+    train_dir = data_config["train_dir"]
+    valid_dir = data_config["valid_dir"]
     class_names = load_classes(data_config["names"])
 
     # Initiate model
@@ -65,7 +65,7 @@ if __name__ == "__main__":
             model.load_darknet_weights(opt.pretrained_weights)
 
     # Get dataloader
-    dataset = ListDataset(train_path, augment=True, multiscale=opt.multiscale_training)
+    dataset = CocoDetection(train_dir, augment=True, multiscale=opt.multiscale_training)
     dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=opt.batch_size,
@@ -153,7 +153,7 @@ if __name__ == "__main__":
             # Evaluate the model on the validation set
             precision, recall, AP, f1, ap_class = evaluate(
                 model,
-                path=valid_path,
+                dir=valid_dir,
                 iou_thres=0.5,
                 conf_thres=0.5,
                 nms_thres=0.5,

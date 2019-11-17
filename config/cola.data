@@ -1,6 +1,6 @@
 classes= 2
-train=data/cola/trainvalno5k.txt
-valid=data/cola/5k.txt
+train_dir=data/cola/train_label.txt
+valid_dir=data/cola/valid_label.txt
 names=data/cola/cola.names
 backup=backup/
 eval=cola
