@@ -58,7 +58,9 @@ def convert_annotation(image_id):
     for obj in root.iter('object'):
         cls = obj.find('name').text
         if cls not in classes:
-            continue
+            print('类别错误')
+            os._exit(3)
+            return
         cls_id = classes.index(cls)
         xmlbox = obj.find('bndbox')
         b = (round(float(xmlbox.find('xmin').text), 3), round(float(xmlbox.find('xmax').text), 3), round(float(xmlbox.find('ymin').text), 3),

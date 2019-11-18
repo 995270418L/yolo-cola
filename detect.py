@@ -1,32 +1,72 @@
 from __future__ import division
 
+import argparse
+import datetime
+import io
+
+from matplotlib.ticker import NullLocator
+from torch.utils.data import DataLoader
+
 from models import *
-from utils.utils import *
 from utils.datasets import *
 
-import os
-import sys
-import time
-import datetime
-import argparse
 
-from PIL import Image
+# config parameters
+model_def = 'config/yolov3-cola.cfg'
+weights_path = 'checkpoints/yolov3_ckpt_8.pth'
+class_path = 'data/cola/cola.names'
+conf_thres = 0.8  # todo 调节它的大小 0 - 1
+nms_thres = 0.4
+n_cpu = 0
+img_size = 416
 
-import torch
-from torch.utils.data import DataLoader
-from torchvision import datasets
-from torch.autograd import Variable
+# model setup
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = Darknet(model_def, img_size=img_size).to(device)
 
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-from matplotlib.ticker import NullLocator
+if weights_path.endswith(".weights"):
+    model.load_darknet_weights(weights_path)
+else:
+    model.load_state_dict(torch.load(weights_path, map_location=device))
+model.eval()
+classes = load_classes(class_path)
+Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
 
-if __name__ == "__main__":
+print("init over ...")
+def transform_image(image_bytes):
+    img = transforms.ToTensor()(Image.open(io.BytesIO(image_bytes)))
+    _, h, w = img.shape
+    img, _ = pad_to_square(img, 0)
+    img = resize(img, img_size)
+    return h, w, img.unsqueeze(0)
+
+def get_prediction(img_bytes):
+    h, w, input_imgs = transform_image(img_bytes)
+    input_imgs = Variable(input_imgs.type(Tensor))
+    with torch.no_grad():
+        detections = model(input_imgs)
+        detections = non_max_suppression(detections, conf_thres, nms_thres)
+    data = []
+    detections = detections[0]
+    if detections is not None:
+        detections = rescale_boxes(detections, img_size, (h, w))
+        print(detections)
+        for x1, y1, x2, y2, conf, cls_conf, cls_pred in detections:
+            output = {}
+            output['cat'] = int(cls_pred)
+            output['score'] = cls_conf.item()
+            box_w = x2 - x1
+            box_h = y2 - y1
+            output['box'] = [x1.item(), y1.item(), box_w.item(), box_h.item()]  # 左上角， 右下角
+            data.append(output)
+    return data
+
+def src():
     parser = argparse.ArgumentParser()
     parser.add_argument("--image_folder", type=str, default="data/samples", help="path to dataset")
-    parser.add_argument("--model_def", type=str, default="config/yolov3-cola.cfg", help="path to model definition file")
+    parser.add_argument("--model_def", type=str, default="config/yolov3.cfg", help="path to model definition file")
     parser.add_argument("--weights_path", type=str, default="weights/yolov3.weights", help="path to weights file")
-    parser.add_argument("--class_path", type=str, default="data/cola/cola.names", help="path to class label file")
+    parser.add_argument("--class_path", type=str, default="data/coco.names", help="path to class label file")
     parser.add_argument("--conf_thres", type=float, default=0.8, help="object confidence threshold")
     # parser.add_argument("--conf_thres", type=float, default=0.1, help="object confidence threshold")
     parser.add_argument("--nms_thres", type=float, default=0.4, help="iou thresshold for non-maximum suppression")
@@ -71,9 +111,9 @@ if __name__ == "__main__":
     print("\nPerforming object detection:")
     prev_time = time.time()
     for batch_i, (img_paths, input_imgs) in enumerate(dataloader):
+        print(input_imgs.shape)
         # Configure input
         input_imgs = Variable(input_imgs.type(Tensor))
-
         # Get detections
         with torch.no_grad():
             detections = model(input_imgs)
@@ -83,8 +123,8 @@ if __name__ == "__main__":
         current_time = time.time()
         inference_time = datetime.timedelta(seconds=current_time - prev_time)
         prev_time = current_time
-        print("\t+ Batch %d, Inference Time: %s" % (batch_i, inference_time))
-
+        # print("\t+ Batch %d, Inference Time: %s" % (batch_i, inference_time))
+        print(type(detections))
         # Save image and detections
         imgs.extend(img_paths)
         img_detections.extend(detections)
@@ -93,10 +133,14 @@ if __name__ == "__main__":
     cmap = plt.get_cmap("tab20b")
     colors = [cmap(i) for i in np.linspace(0, 1, 20)]
 
+    print("images length :{}".format(len(imgs)))
+    print(imgs)
+    print("detections length :{}".format(len(img_detections)))
     print("\nSaving images:")
     # Iterate through images and save plot of detections
     for img_i, (path, detections) in enumerate(zip(imgs, img_detections)):
 
+        print(type(detections))
         print("(%d) Image: '%s'" % (img_i, path))
 
         # Create plot
@@ -114,12 +158,11 @@ if __name__ == "__main__":
             bbox_colors = random.sample(colors, n_cls_preds)
             print("detection : {}".format(detections))
             for x1, y1, x2, y2, conf, cls_conf, cls_pred in detections:
-                print(int(cls_pred))
-                print("\t+ Label: %s, Conf: %.5f" % (classes[int(cls_pred)], cls_conf.item()))
+                # print("\t+ Label: %s, Conf: %.5f" % (classes[int(cls_pred)], cls_conf.item()))
 
                 box_w = x2 - x1
                 box_h = y2 - y1
-
+                print(x1, y1, box_w, box_h)
                 color = bbox_colors[int(np.where(unique_labels == int(cls_pred))[0])]
                 # Create a Rectangle patch
                 bbox = patches.Rectangle((x1, y1), box_w, box_h, linewidth=2, edgecolor=color, facecolor="none")
@@ -143,3 +186,5 @@ if __name__ == "__main__":
         print(filename)
         plt.savefig(f"output/{filename}.png", bbox_inches="tight", pad_inches=0.0)
         plt.close()
+if __name__ == '__main__':
+    src()

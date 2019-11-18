@@ -12,7 +12,6 @@ from torch.utils.data import Dataset
 import torchvision.transforms as transforms
 
 from utils.utils import *
-import image_to_numpy
 
 def pad_to_square(img, pad_value):
     c, h, w = img.shape
@@ -25,17 +24,14 @@ def pad_to_square(img, pad_value):
     img = F.pad(img, pad, "constant", value=pad_value)
     return img, pad
 
-
 def resize(image, size):
     image = F.interpolate(image.unsqueeze(0), size=size, mode="nearest").squeeze(0)
     return image
-
 
 def random_resize(images, min_size=288, max_size=448):
     new_size = random.sample(list(range(min_size, max_size + 1, 32)), 1)[0]
     images = F.interpolate(images, size=new_size, mode="nearest")
     return images
-
 
 class ImageFolder(Dataset):
     def __init__(self, folder_path, img_size=416):
@@ -47,11 +43,12 @@ class ImageFolder(Dataset):
         # Extract image as PyTorch tensor
         np_img = load_image_file(img_path)
         img = transforms.ToTensor()(np_img)
+        print("####### : {}".format(img.shape))
         # Pad to square resolution
         img, _ = pad_to_square(img, 0)
         # Resize
         img = resize(img, self.img_size)
-
+        print("@@@@@@: {}".format(img.shape))
         return img_path, img
 
     def __len__(self):
