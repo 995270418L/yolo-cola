@@ -11,6 +11,8 @@ from utils.augmentations import horisontal_flip
 from torch.utils.data import Dataset
 import torchvision.transforms as transforms
 
+from utils.utils import *
+import image_to_numpy
 
 def pad_to_square(img, pad_value):
     c, h, w = img.shape
@@ -43,7 +45,8 @@ class ImageFolder(Dataset):
     def __getitem__(self, index):
         img_path = self.files[index % len(self.files)]
         # Extract image as PyTorch tensor
-        img = transforms.ToTensor()(Image.open(img_path))
+        np_img = load_image_file(img_path)
+        img = transforms.ToTensor()(np_img)
         # Pad to square resolution
         img, _ = pad_to_square(img, 0)
         # Resize

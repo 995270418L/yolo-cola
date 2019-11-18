@@ -10,6 +10,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
+import PIL.Image
+import PIL.ImageOps
+import numpy as np
 
 def to_cpu(tensor):
     return tensor.detach().cpu()
@@ -19,10 +22,13 @@ def load_classes(path):
     """
     Loads class labels at 'path'
     """
-    fp = open(path, "r")
-    names = fp.read().split("\n")[:-1]
+    names = []
+    with open(path, 'r') as fp:
+        lines = fp.readlines()
+        for line in lines:
+            if line.strip() != '':
+                names.append(line.rstrip())
     return names
-
 
 def weights_init_normal(m):
     classname = m.__class__.__name__
@@ -319,3 +325,52 @@ def build_targets(pred_boxes, pred_cls, target, anchors, ignore_thres):
 
     tconf = obj_mask.float()
     return iou_scores, class_mask, obj_mask, noobj_mask, tx, ty, tw, th, tcls, tconf
+
+def exif_transpose(img):
+    if not img:
+        return img
+    exif_orientation_tag = 274
+    # Check for EXIF data (only present on some files)
+    if hasattr(img, "_getexif") and isinstance(img._getexif(), dict) and exif_orientation_tag in img._getexif():
+        print("########################### exif data found... @@@@@@@@@@@@@@@@@@@@@@@@")
+        exif_data = img._getexif()
+    else:
+        return img
+    orientation = exif_data[exif_orientation_tag]
+    # Handle EXIF Orientation
+    if orientation == 1:
+        pass
+    elif orientation == 2:
+        # Mirrored left to right
+        img = img.transpose(PIL.Image.FLIP_LEFT_RIGHT)
+    elif orientation == 3:
+        # Rotated 180 degrees
+        img = img.rotate(180)
+    elif orientation == 4:
+        # Mirrored top to bottom
+        img = img.rotate(180).transpose(PIL.Image.FLIP_LEFT_RIGHT)
+    elif orientation == 5:
+        # Mirrored along top-left diagonal
+        img = img.rotate(-90, expand=True).transpose(PIL.Image.FLIP_LEFT_RIGHT)
+    elif orientation == 6:
+        # Rotated 90 degrees
+        img = img.rotate(-90, expand=True)
+    elif orientation == 7:
+        # Mirrored along top-right diagonal
+        img = img.rotate(90, expand=True).transpose(PIL.Image.FLIP_LEFT_RIGHT)
+    elif orientation == 8:
+        # Rotated 270 degrees
+        img = img.rotate(90, expand=True)
+    return img
+
+def load_image_file(file, mode='RGB'):
+    # Load the image with PIL
+    print(file)
+    img = PIL.Image.open(file)
+    # if hasattr(PIL.ImageOps, 'exif_transpose'):
+    #     # Very recent versions of PIL can do exit transpose internally
+    #     img = PIL.ImageOps.exif_transpose(img)
+    # else:
+    # img = exif_transpose(img)
+    # img = img.convert(mode)
+    return np.array(img)
