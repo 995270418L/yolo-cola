@@ -292,6 +292,11 @@ def build_targets(pred_boxes, pred_cls, target, anchors, ignore_thres):
     th = FloatTensor(nB, nA, nG, nG).fill_(0)
     tcls = FloatTensor(nB, nA, nG, nG, nC).fill_(0)
 
+    obj_mask = obj_mask.bool()
+    noobj_mask = noobj_mask.bool()
+
+    target = target[target.sum(dim=1) != 0]
+
     # Convert to position relative to box
     target_boxes = target[:, 2:6] * nG  # x ,y , w, h
     gxy = target_boxes[:, :2]
@@ -301,16 +306,32 @@ def build_targets(pred_boxes, pred_cls, target, anchors, ignore_thres):
     best_ious, best_n = ious.max(0)
     # Separate target values
     b, target_labels = target[:, :2].long().t()
+
+    b = b % 10
+
     gx, gy = gxy.t()
     gw, gh = gwh.t()
     gi, gj = gxy.long().t()
+
+    # note: gt box may cross the boundary
+    gi[gi < 0] = 0
+    gj[gj < 0] = 0
+    gi[gi > nG - 1] = nG - 1
+    gj[gj > nG - 1] = nG - 1
+
     # Set masks
     obj_mask[b, best_n, gj, gi] = 1
     noobj_mask[b, best_n, gj, gi] = 0
 
+    a1 = list(obj_mask[obj_mask].size())[0]
+    a2 = list(target_boxes.size())[0]
+    b1 = list(noobj_mask[noobj_mask].size())[0]
+
     # Set noobj mask to zero where iou exceeds ignore threshold
     for i, anchor_ious in enumerate(ious.t()):
         noobj_mask[b[i], anchor_ious > ignore_thres, gj[i], gi[i]] = 0
+
+    b2 = list(noobj_mask[noobj_mask].size())[0]
 
     # Coordinates
     tx[b, best_n, gj, gi] = gx - gx.floor()

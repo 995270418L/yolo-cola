@@ -66,7 +66,10 @@ if __name__ == "__main__":
         collate_fn=dataset.collate_fn,
     )
 
+    model = nn.DataParallel(model, device_ids=[0])
     optimizer = torch.optim.Adam(model.parameters())
+
+    print(optimizer)
 
     metrics = [
         "grid_size",
@@ -91,11 +94,18 @@ if __name__ == "__main__":
         for batch_i, (_, imgs, targets) in enumerate(dataloader):
             batches_done = len(dataloader) * epoch + batch_i
 
-            imgs = Variable(imgs.to(device))
-            targets = Variable(targets.to(device), requires_grad=False)
+            # imgs = Variable(imgs.to(device))
+            imgs = imgs.cuda()
+            targets = targets.cuda()
+            # targets = Variable(targets.to(device), requires_grad=False)
+
+            print('imgs size: ', imgs.size())
+            print('targets size: ', targets.size())
 
             loss, outputs = model(imgs, targets)
-            loss.backward()
+            # loss.backward()
+            loss.sum().backward()
+
 
             if batches_done % opt.gradient_accumulations:
                 # Accumulates gradient before each step
@@ -108,14 +118,14 @@ if __name__ == "__main__":
 
             log_str = "\n---- [Epoch %d/%d, Batch %d/%d] ----\n" % (epoch, opt.epochs, batch_i, len(dataloader))
 
-            metric_table = [["Metrics", *[f"YOLO Layer {i}" for i in range(len(model.yolo_layers))]]]
+            metric_table = [["Metrics", *[f"YOLO Layer {i}" for i in range(len(model.module.yolo_layers))]]]
 
             # Log metrics at each YOLO layer
             for i, metric in enumerate(metrics):
                 formats = {m: "%.6f" for m in metrics}
                 formats["grid_size"] = "%2d"
                 formats["cls_acc"] = "%.2f%%"
-                row_metrics = [formats[metric] % yolo.metrics.get(metric, 0) for yolo in model.yolo_layers]
+                row_metrics = [formats[metric] % yolo.metrics.get(metric, 0) for yolo in model.module.yolo_layers]
                 metric_table += [[metric, *row_metrics]]
 
                 # Tensorboard logging
@@ -128,14 +138,14 @@ if __name__ == "__main__":
                 # logger.list_of_scalars_summary(tensorboard_log, batches_done)
 
             log_str += AsciiTable(metric_table).table
-            log_str += f"\nTotal loss {loss.item()}"
+            log_str += f"\nTotal loss {loss.sum().item()}"
 
             # Determine approximate time left for epoch
             epoch_batches_left = len(dataloader) - (batch_i + 1)
             time_left = datetime.timedelta(seconds=epoch_batches_left * (time.time() - start_time) / (batch_i + 1))
             log_str += f"\n---- ETA {time_left}"
             logger.info(log_str)
-            model.seen += imgs.size(0)
+            model.module.seen += imgs.size(0)
         if epoch % opt.evaluation_interval == 0:
             logger.info("\n---- Evaluating Model ----")
             # Evaluate the model on the validation set
