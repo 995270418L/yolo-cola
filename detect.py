@@ -13,15 +13,16 @@ from utils.datasets import *
 
 # config parameters
 model_def = 'config/yolov3-cola.cfg'
-weights_path = 'checkpoints/yolov3_ckpt_8.pth'
+weights_path = 'checkpoints/yolov3_ckpt_23.pth'
 class_path = 'data/cola/cola.names'
-conf_thres = 0.8  # todo 调节它的大小 0 - 1
+conf_thres = 0.9  # todo 调节它的大小 0 - 1
 nms_thres = 0.4
 n_cpu = 0
 img_size = 416
 
 # model setup
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("GPU: {}".format(torch.cuda.is_available()))
 model = Darknet(model_def, img_size=img_size).to(device)
 
 if weights_path.endswith(".weights"):
@@ -33,8 +34,17 @@ classes = load_classes(class_path)
 Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
 
 print("init over ...")
+i = 0
+
 def transform_image(image_bytes):
-    img = transforms.ToTensor()(Image.open(io.BytesIO(image_bytes)))
+    global i
+    np_arr = Image.open(io.BytesIO(image_bytes))
+    new_arr = Image.open(io.BytesIO(image_bytes))
+    # if i // 100 == 0:
+    #     new_arr.convert('RGB')
+    #     new_arr.save('data/samples/{}.jpg'.format(i))
+    #     i = i+1
+    img = transforms.ToTensor()(np_arr)
     _, h, w = img.shape
     img, _ = pad_to_square(img, 0)
     img = resize(img, img_size)
@@ -42,6 +52,7 @@ def transform_image(image_bytes):
 
 def get_prediction(img_bytes):
     h, w, input_imgs = transform_image(img_bytes)
+    print(h, w)
     input_imgs = Variable(input_imgs.type(Tensor))
     with torch.no_grad():
         detections = model(input_imgs)
@@ -53,21 +64,21 @@ def get_prediction(img_bytes):
         print(detections)
         for x1, y1, x2, y2, conf, cls_conf, cls_pred in detections:
             output = {}
-            output['cat'] = int(cls_pred)
+            output['cat'] = int(cls_pred) + 1
             output['score'] = cls_conf.item()
-            box_w = x2 - x1
-            box_h = y2 - y1
-            output['box'] = [x1.item(), y1.item(), box_w.item(), box_h.item()]  # 左上角， 右下角
+            # box_w =  - x1
+            # box_h = y2 - y1
+            output['box'] = [int(x1.item()), int(y1.item()), int(x2.item()), int(y2.item())]  # 左上角， 右下角
             data.append(output)
     return data
 
 def src():
     parser = argparse.ArgumentParser()
     parser.add_argument("--image_folder", type=str, default="data/samples", help="path to dataset")
-    parser.add_argument("--model_def", type=str, default="config/yolov3.cfg", help="path to model definition file")
-    parser.add_argument("--weights_path", type=str, default="weights/yolov3.weights", help="path to weights file")
-    parser.add_argument("--class_path", type=str, default="data/coco.names", help="path to class label file")
-    parser.add_argument("--conf_thres", type=float, default=0.8, help="object confidence threshold")
+    parser.add_argument("--model_def", type=str, default="config/yolov3-cola.cfg", help="path to model definition file")
+    parser.add_argument("--weights_path", type=str, default="checkpoints/yolov3_ckpt_23.pth", help="path to weights file")
+    parser.add_argument("--class_path", type=str, default="data/cola/cola.names", help="path to class label file")
+    parser.add_argument("--conf_thres", type=float, default=0.5, help="object confidence threshold")
     # parser.add_argument("--conf_thres", type=float, default=0.1, help="object confidence threshold")
     parser.add_argument("--nms_thres", type=float, default=0.4, help="iou thresshold for non-maximum suppression")
     # parser.add_argument("--nms_thres", type=float, default=0.1, help="iou thresshold for non-maximum suppression")
@@ -124,7 +135,6 @@ def src():
         inference_time = datetime.timedelta(seconds=current_time - prev_time)
         prev_time = current_time
         # print("\t+ Batch %d, Inference Time: %s" % (batch_i, inference_time))
-        print(type(detections))
         # Save image and detections
         imgs.extend(img_paths)
         img_detections.extend(detections)
@@ -140,7 +150,6 @@ def src():
     # Iterate through images and save plot of detections
     for img_i, (path, detections) in enumerate(zip(imgs, img_detections)):
 
-        print(type(detections))
         print("(%d) Image: '%s'" % (img_i, path))
 
         # Create plot
@@ -184,7 +193,8 @@ def src():
         plt.gca().yaxis.set_major_locator(NullLocator())
         filename = path.split(os.sep)[-1].split(".")[0]
         print(filename)
-        plt.savefig(f"output/{filename}.png", bbox_inches="tight", pad_inches=0.0)
+        plt.savefig(f"outputs/{filename}.png", bbox_inches="tight", pad_inches=0.0)
         plt.close()
+
 if __name__ == '__main__':
     src()

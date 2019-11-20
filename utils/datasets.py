@@ -43,12 +43,10 @@ class ImageFolder(Dataset):
         # Extract image as PyTorch tensor
         np_img = load_image_file(img_path)
         img = transforms.ToTensor()(np_img)
-        print("####### : {}".format(img.shape))
         # Pad to square resolution
         img, _ = pad_to_square(img, 0)
         # Resize
         img = resize(img, self.img_size)
-        print("@@@@@@: {}".format(img.shape))
         return img_path, img
 
     def __len__(self):
