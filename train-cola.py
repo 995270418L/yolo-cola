@@ -66,7 +66,7 @@ if __name__ == "__main__":
         collate_fn=dataset.collate_fn,
     )
 
-    model = nn.DataParallel(model, device_ids=[0])
+    model = nn.DataParallel(model, device_ids=[0, 1])
     optimizer = torch.optim.Adam(model.parameters())
 
     print(optimizer)
