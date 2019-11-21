@@ -40,10 +40,6 @@ def transform_image(image_bytes):
     global i
     np_arr = Image.open(io.BytesIO(image_bytes))
     new_arr = Image.open(io.BytesIO(image_bytes))
-    # if i // 100 == 0:
-    #     new_arr.convert('RGB')
-    #     new_arr.save('data/samples/{}.jpg'.format(i))
-    #     i = i+1
     img = transforms.ToTensor()(np_arr)
     _, h, w = img.shape
     img, _ = pad_to_square(img, 0)
